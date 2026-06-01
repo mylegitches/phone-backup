@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ADB Phone Backup Wizard</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="nav-brand">&#128241; ADB Backup</div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" data-tab="wizard">&#129497; Setup Wizard</button>
+    <button class="nav-tab" data-tab="jobs">&#128193; Job Builder</button>
+    <button class="nav-tab" data-tab="run">&#9654; Run Backup</button>
+    <button class="nav-tab" data-tab="tools">&#128295; Device Tools</button>
+    <button class="nav-tab" data-tab="apps">&#128640; App Manager</button>
+  </div>
+  <div class="nav-device" id="device-badge">
+    <span class="device-dot" id="device-dot"></span>
+    <span id="device-label">No device</span>
+    <button class="btn-sm" onclick="refreshDevices()">&#8635;</button>
+  </div>
+</nav>
+
+<main>
+
+<!-- ====================================================== WIZARD ====== -->
+<section id="tab-wizard" class="tab-content active">
+  <div class="wizard-container">
+    <div class="wizard-steps-bar" id="wizard-steps-bar">
+      <div class="wizard-step-item active" data-step="0"><span class="step-num">1</span> Install ADB</div>
+      <div class="wizard-step-item" data-step="1"><span class="step-num">2</span> Dev Options</div>
+      <div class="wizard-step-item" data-step="2"><span class="step-num">3</span> USB Debugging</div>
+      <div class="wizard-step-item" data-step="3"><span class="step-num">4</span> Connect Phone</div>
+      <div class="wizard-step-item" data-step="4"><span class="step-num">5</span> Verify</div>
+    </div>
+
+    <!-- Step 0: Install ADB -->
+    <div class="wizard-step active" id="wstep-0">
+      <h2>Step 1 — Install Android Platform Tools (ADB)</h2>
+      <div id="platform-info-loading" class="muted">Detecting your operating system...</div>
+      <div id="platform-info" style="display:none">
+        <div class="info-box" id="os-detected-box"></div>
+        <div id="install-steps-list"></div>
+        <div class="row-gap">
+          <a id="download-btn" href="#" target="_blank" class="btn btn-secondary">&#8659; Download Platform Tools</a>
+          <button class="btn btn-primary" onclick="checkAdb()">&#10003; Check ADB</button>
+        </div>
+        <div id="adb-check-result" class="result-box" style="display:none"></div>
+        <div id="udev-note" class="warn-box" style="display:none"></div>
+      </div>
+      <div class="wizard-nav">
+        <button class="btn btn-primary" onclick="wizardGo(1)">Next &#8250;</button>
+      </div>
+    </div>
+
+    <!-- Step 1: Developer Options -->
+    <div class="wizard-step" id="wstep-1">
+      <h2>Step 2 — Enable Developer Options</h2>
+      <div class="instruction-card">
+        <ol>
+          <li>Open <strong>Settings</strong> on your phone.</li>
+          <li>Scroll down and tap <strong>About Phone</strong>.</li>
+          <li>Find <strong>Build Number</strong> and tap it <strong>7 times</strong> rapidly.</li>
+          <li>You'll see a message: <em>"You are now a developer!"</em></li>
+          <li>On some phones (Samsung), it's under <em>Settings → Software information → Build number</em>.</li>
+        </ol>
+        <div class="tip-box">&#128161; Tip: You may need to enter your PIN/password when tapping Build Number.</div>
+      </div>
+      <div class="wizard-nav">
+        <button class="btn btn-outline" onclick="wizardGo(0)">&#8249; Back</button>
+        <button class="btn btn-primary" onclick="wizardGo(2)">Next &#8250;</button>
+      </div>
+    </div>
+
+    <!-- Step 2: USB Debugging -->
+    <div class="wizard-step" id="wstep-2">
+      <h2>Step 3 — Enable USB Debugging</h2>
+      <div class="instruction-card">
+        <ol>
+          <li>Open <strong>Settings → Developer Options</strong> (now visible from Step 2).</li>
+          <li>Toggle <strong>USB Debugging</strong> to ON.</li>
+          <li>Connect your phone to your computer with a USB cable.</li>
+          <li>Change the USB connection mode to <strong>File Transfer (MTP)</strong> on your phone's notification pull-down.</li>
+          <li>When prompted on the phone screen: tap <strong>"Allow USB debugging"</strong> and check <em>"Always allow from this computer"</em>.</li>
+        </ol>
+        <div class="tip-box">&#128161; Tip: If you don't see the USB debugging prompt, disconnect and reconnect the cable.</div>
+      </div>
+      <div class="wizard-nav">
+        <button class="btn btn-outline" onclick="wizardGo(1)">&#8249; Back</button>
+        <button class="btn btn-primary" onclick="wizardGo(3)">Next &#8250;</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Connect & Pair -->
+    <div class="wizard-step" id="wstep-3">
+      <h2>Step 4 — Connect Your Phone</h2>
+      <div class="tabs-inner">
+        <button class="inner-tab active" onclick="switchInnerTab('usb-tab', this)">USB Cable</button>
+        <button class="inner-tab" onclick="switchInnerTab('wifi-tab', this)">Wi-Fi (Wireless)</button>
+      </div>
+
+      <div id="usb-tab" class="inner-tab-content active">
+        <div class="instruction-card">
+          <p>Your phone should already be connected via USB. Click below to detect it.</p>
+          <button class="btn btn-primary" onclick="detectDevices()">&#128246; Detect Device</button>
+          <div id="detect-result" class="result-box" style="display:none;margin-top:12px"></div>
+        </div>
+      </div>
+
+      <div id="wifi-tab" class="inner-tab-content" style="display:none">
+        <div class="instruction-card">
+          <h3>Android 11+ Wireless Debugging</h3>
+          <ol>
+            <li>Go to <strong>Settings → Developer Options → Wireless Debugging</strong>.</li>
+            <li>Enable <strong>Wireless Debugging</strong>.</li>
+            <li>Tap <strong>"Pair device with pairing code"</strong>.</li>
+            <li>Note the IP address, port, and 6-digit code shown on your phone.</li>
+          </ol>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Phone IP Address</label>
+              <input type="text" id="wifi-ip" placeholder="192.168.1.100">
+            </div>
+            <div class="form-group">
+              <label>Pairing Port</label>
+              <input type="text" id="wifi-pair-port" placeholder="37405">
+            </div>
+            <div class="form-group">
+              <label>6-Digit Code</label>
+              <input type="text" id="wifi-code" placeholder="123456">
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="pairWifi()">Pair Device</button>
+          <div id="pair-result" class="result-box" style="display:none;margin-top:12px"></div>
+
+          <hr class="divider">
+          <h3>Legacy WiFi ADB (Android 10 and older)</h3>
+          <p>First connect via USB, then run <code>adb tcpip 5555</code>, then connect wirelessly.</p>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Phone IP Address</label>
+              <input type="text" id="legacy-ip" placeholder="192.168.1.100">
+            </div>
+          </div>
+          <div class="row-gap">
+            <button class="btn btn-secondary" onclick="enableTcpip()">1. Enable TCP/IP Mode</button>
+            <button class="btn btn-primary" onclick="connectLegacyWifi()">2. Connect Wirelessly</button>
+          </div>
+          <div id="legacy-result" class="result-box" style="display:none;margin-top:12px"></div>
+        </div>
+      </div>
+
+      <div class="wizard-nav">
+        <button class="btn btn-outline" onclick="wizardGo(2)">&#8249; Back</button>
+        <button class="btn btn-primary" onclick="wizardGo(4)">Next &#8250;</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Done -->
+    <div class="wizard-step" id="wstep-4">
+      <h2>Step 5 — Verify Connection</h2>
+      <button class="btn btn-primary" onclick="verifyConnection()" style="margin-bottom:16px">&#128246; Check Connected Devices</button>
+      <div id="verify-result" class="result-box" style="display:none"></div>
+      <div id="verify-success" style="display:none">
+        <div class="success-box">
+          <strong>&#10003; Device connected!</strong> You're ready to back up.
+          <div style="margin-top:12px">
+            <button class="btn btn-primary" onclick="showTab('jobs')">Build a Backup Job &#8250;</button>
+            <button class="btn btn-secondary" onclick="showTab('tools')">Explore Device Tools &#8250;</button>
+          </div>
+        </div>
+      </div>
+      <div class="wizard-nav">
+        <button class="btn btn-outline" onclick="wizardGo(3)">&#8249; Back</button>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ====================================================== JOBS ======= -->
+<section id="tab-jobs" class="tab-content">
+  <div class="jobs-layout">
+
+    <!-- Left: job list -->
+    <div class="jobs-sidebar">
+      <div class="sidebar-header">
+        <h3>Saved Jobs</h3>
+        <button class="btn btn-primary btn-sm" onclick="newJob()">+ New</button>
+      </div>
+      <div id="jobs-list">
+        <div class="muted" style="padding:16px">Loading jobs...</div>
+      </div>
+    </div>
+
+    <!-- Right: job editor -->
+    <div class="jobs-editor" id="job-editor">
+      <div class="editor-empty" id="editor-empty">
+        <p>Select a job to edit, or create a new one.</p>
+        <button class="btn btn-primary" onclick="newJob()">+ New Job</button>
+      </div>
+
+      <form id="job-form" style="display:none" onsubmit="saveJob(event)">
+        <input type="hidden" id="job-id">
+        <div class="form-group">
+          <label>Job Name</label>
+          <input type="text" id="job-name" placeholder="e.g. Weekly Family Backup" required>
+        </div>
+        <div class="form-group">
+          <label>Device Serial <span class="muted">(leave blank for any connected device)</span></label>
+          <div class="input-row">
+            <input type="text" id="job-serial" placeholder="e.g. emulator-5554 or leave blank">
+            <button type="button" class="btn btn-sm btn-outline" onclick="fillCurrentSerial('job-serial')">Use Current</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Backup Method</label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="method" value="pull" checked onchange="toggleMethod()">
+              <strong>adb pull</strong> — copy media files &amp; folders
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="method" value="backup" onchange="toggleMethod()">
+              <strong>adb backup</strong> — app data &amp; system backup <span class="badge-warn">deprecated in Android 12+</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Pull mappings -->
+        <div id="pull-options">
+          <div class="section-header">
+            <h4>Source → Destination Mappings</h4>
+            <button type="button" class="btn btn-sm btn-outline" onclick="addMapping()">+ Add Row</button>
+          </div>
+          <table class="mapping-table">
+            <thead>
+              <tr>
+                <th>Source on Phone</th>
+                <th>Destination on Computer</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="mapping-tbody"></tbody>
+          </table>
+        </div>
+
+        <!-- Backup options -->
+        <div id="backup-options" style="display:none">
+          <h4>ADB Backup Options</h4>
+          <div class="checkbox-group">
+            <label><input type="checkbox" id="flag-apk"> <code>-apk</code> Include APK files</label>
+            <label><input type="checkbox" id="flag-shared" checked> <code>-shared</code> Include SD card / shared storage</label>
+            <label><input type="checkbox" id="flag-all" checked> <code>-all</code> All installed apps</label>
+            <label><input type="checkbox" id="flag-system"> <code>-system</code> Include system apps</label>
+          </div>
+          <div class="form-group" style="margin-top:12px">
+            <label>Output File Path <span class="muted">(.ab file on your computer)</span></label>
+            <input type="text" id="backup-output" placeholder="C:\Backups\full_backup.ab">
+          </div>
+          <div class="warn-box">&#9888; After clicking Run, watch your phone screen — you must tap "Back up my data" to authorize.</div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">&#128190; Save Job</button>
+          <button type="button" class="btn btn-success" onclick="runJobFromEditor()">&#9654; Run Now</button>
+          <button type="button" class="btn btn-outline btn-danger" onclick="deleteCurrentJob()" id="delete-job-btn" style="display:none">&#128465; Delete</button>
+        </div>
+      </form>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ====================================================== RUN ======== -->
+<section id="tab-run" class="tab-content">
+  <div class="run-layout">
+    <div class="run-controls card">
+      <h3>Run a Backup Job</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Select Job</label>
+          <select id="run-job-select">
+            <option value="">-- choose a job --</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Device <span class="muted">(overrides job setting)</span></label>
+          <select id="run-device-select">
+            <option value="">-- auto detect --</option>
+          </select>
+        </div>
+      </div>
+      <div class="row-gap">
+        <button class="btn btn-success" id="run-btn" onclick="startBackup()">&#9654; Start Backup</button>
+        <button class="btn btn-danger" id="cancel-btn" onclick="cancelBackup()" style="display:none">&#9632; Cancel</button>
+      </div>
+      <div id="run-progress"></div>
+    </div>
+
+    <div class="terminal-wrap card">
+      <div class="terminal-header">
+        <span>Output</span>
+        <button class="btn-sm btn-outline" onclick="clearTerminal()">Clear</button>
+      </div>
+      <div class="terminal" id="terminal">
+        <div class="terminal-placeholder">Output will appear here when a backup runs...</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ====================================================== TOOLS ====== -->
+<section id="tab-tools" class="tab-content">
+  <div class="tools-header">
+    <div class="form-group" style="max-width:280px">
+      <label>Active Device</label>
+      <select id="tools-device-select">
+        <option value="">-- auto detect --</option>
+      </select>
+    </div>
+  </div>
+
+  <h3 class="tools-category">&#11088; Tricks From the Article</h3>
+  <div class="tools-grid">
+
+    <div class="tool-card highlight">
+      <div class="tool-icon">&#128250;</div>
+      <h4>Mirror Screen</h4>
+      <p>Display your phone screen on your PC in real-time. Requires <a href="https://github.com/Genymobile/scrcpy" target="_blank">scrcpy</a> installed separately.</p>
+      <div class="tool-body">
+        <code class="code-block">scrcpy -s &lt;serial&gt;</code>
+        <p class="muted small">Install scrcpy, then run that command in a terminal. It's the best screen mirror tool available.</p>
+      </div>
+    </div>
+
+    <div class="tool-card highlight">
+      <div class="tool-icon">&#128465;</div>
+      <h4>Wipe App Data</h4>
+      <p>Clear an app's data and cache — like a factory reset for one app. Fixes frozen or broken apps.</p>
+      <div class="tool-body">
+        <input type="text" id="wipe-pkg" placeholder="com.example.app" class="tool-input">
+        <button class="btn btn-danger btn-sm" onclick="toolWipeData()">Clear Data</button>
+        <div id="wipe-result" class="result-inline"></div>
+      </div>
+    </div>
+
+    <div class="tool-card highlight">
+      <div class="tool-icon">&#128230;</div>
+      <h4>Sideload APK</h4>
+      <p>Install an APK from your computer onto your phone — no Play Store needed.</p>
+      <div class="tool-body">
+        <input type="file" id="apk-file" accept=".apk" class="tool-input">
+        <button class="btn btn-primary btn-sm" onclick="toolInstallApk()">Install APK</button>
+        <div id="install-result" class="result-inline"></div>
+      </div>
+    </div>
+
+    <div class="tool-card highlight">
+      <div class="tool-icon">&#128246;</div>
+      <h4>Wireless ADB Setup</h4>
+      <p>Connect your phone over Wi-Fi — no USB cable needed after pairing.</p>
+      <div class="tool-body">
+        <p class="small">Use the <strong>Setup Wizard → Step 4</strong> for full pairing instructions.</p>
+        <button class="btn btn-outline btn-sm" onclick="showTab('wizard');wizardGo(3)">Go to Wireless Setup &#8250;</button>
+      </div>
+    </div>
+
+  </div>
+
+  <h3 class="tools-category">&#128247; Screen Tools</h3>
+  <div class="tools-grid">
+
+    <div class="tool-card">
+      <div class="tool-icon">&#128247;</div>
+      <h4>Screenshot</h4>
+      <p>Capture the current phone screen and download it as a PNG.</p>
+      <div class="tool-body">
+        <button class="btn btn-primary btn-sm" onclick="toolScreenshot()">Take Screenshot</button>
+        <div id="screenshot-result" class="result-inline"></div>
+      </div>
+    </div>
+
+    <div class="tool-card">
+      <div class="tool-icon">&#127909;</div>
+      <h4>Screen Record</h4>
+      <p>Record your phone screen to an MP4 file.</p>
+      <div class="tool-body">
+        <div class="input-row">
+          <input type="number" id="rec-duration" value="30" min="5" max="180" class="tool-input-sm"> <span class="muted small">seconds (max 180)</span>
+        </div>
+        <div class="row-gap" style="margin-top:8px">
+          <button class="btn btn-primary btn-sm" id="rec-start-btn" onclick="toolRecordStart()">&#9679; Start</button>
+          <button class="btn btn-danger btn-sm" id="rec-stop-btn" onclick="toolRecordStop()" disabled>&#9632; Stop &amp; Download</button>
+        </div>
+        <div id="rec-result" class="result-inline"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <h3 class="tools-category">&#128193; File Tools</h3>
+  <div class="tools-grid">
+
+    <div class="tool-card">
+      <div class="tool-icon">&#8679;</div>
+      <h4>Push File to Phone</h4>
+      <p>Send a file from your computer to a location on the phone.</p>
+      <div class="tool-body">
+        <input type="file" id="push-file" class="tool-input">
+        <input type="text" id="push-dest" placeholder="/sdcard/Download/" class="tool-input">
+        <button class="btn btn-primary btn-sm" onclick="toolPushFile()">Push File</button>
+        <div id="push-result" class="result-inline"></div>
+      </div>
+    </div>
+
+    <div class="tool-card">
+      <div class="tool-icon">&#8681;</div>
+      <h4>Extract APK from Phone</h4>
+      <p>Pull the installed APK of any app off your device.</p>
+      <div class="tool-body">
+        <input type="text" id="extract-pkg" placeholder="com.example.app" class="tool-input">
+        <button class="btn btn-primary btn-sm" onclick="toolExtractApk()">Extract &amp; Download</button>
+        <div id="extract-result" class="result-inline"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <h3 class="tools-category">&#128246; Device Control</h3>
+  <div class="tools-grid">
+
+    <div class="tool-card">
+      <div class="tool-icon">&#128203;</div>
+      <h4>Clipboard: PC → Phone</h4>
+      <p>Send text from your computer directly to your phone's clipboard.</p>
+      <div class="tool-body">
+        <textarea id="clipboard-text" rows="3" placeholder="Text to send..." class="tool-input"></textarea>
+        <button class="btn btn-primary btn-sm" onclick="toolClipboard()">Send to Phone</button>
+        <div id="clipboard-result" class="result-inline"></div>
+      </div>
+    </div>
+
+    <div class="tool-card">
+      <div class="tool-icon">&#9996;</div>
+      <h4>Input Text</h4>
+      <p>Type text into whatever field is focused on your phone.</p>
+      <div class="tool-body">
+        <input type="text" id="input-text-val" placeholder="Text to type..." class="tool-input">
+        <button class="btn btn-primary btn-sm" onclick="toolInputText()">Type on Phone</button>
+        <div id="input-text-result" class="result-inline"></div>
+      </div>
+    </div>
+
+    <div class="tool-card">
+      <div class="tool-icon">&#9654;</div>
+      <h4>Key Events</h4>
+      <p>Send hardware button presses to your phone.</p>
+      <div class="tool-body">
+        <div class="key-grid">
+          <button class="btn btn-outline btn-xs" onclick="toolKeyEvent(3)">Home</button>
+          <button class="btn btn-outline btn-xs" onclick="toolKeyEvent(4)">Back</button>
+          <button class="btn btn-outline btn-xs" onclick="toolKeyEvent(187)">Recents</button>
+          <button class="btn btn-outline btn-xs" onclick="toolKeyEvent(26)">Power</button>
+          <button class="btn btn-outline btn-xs" onclick="toolKeyEvent(24)">Vol +</button>
+          <button class="btn btn-outline btn-xs" onclick="toolKeyEvent(25)">Vol -</button>
+          <button class="btn btn-outline btn-xs" onclick="toolKeyEvent(164)">Mute</button>
+          <button class="btn btn-outline btn-xs" onclick="toolKeyEvent(66)">Enter</button>
+        </div>
+        <div id="keyevent-result" class="result-inline"></div>
+      </div>
+    </div>
+
+    <div class="tool-card">
+      <div class="tool-icon">&#128260;</div>
+      <h4>Reboot</h4>
+      <p>Reboot your device into different modes.</p>
+      <div class="tool-body">
+        <div class="row-gap">
+          <button class="btn btn-outline btn-sm" onclick="toolReboot('')">Reboot</button>
+          <button class="btn btn-outline btn-sm" onclick="toolReboot('bootloader')">Bootloader</button>
+          <button class="btn btn-outline btn-sm" onclick="toolReboot('recovery')">Recovery</button>
+        </div>
+        <div id="reboot-result" class="result-inline"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <h3 class="tools-category">&#128202; System Info</h3>
+  <div class="tools-grid">
+
+    <div class="tool-card">
+      <div class="tool-icon">&#128267;</div>
+      <h4>Battery Info</h4>
+      <p>Check battery level, health, temperature, and charging status.</p>
+      <div class="tool-body">
+        <button class="btn btn-primary btn-sm" onclick="toolBattery()">Get Battery Info</button>
+        <div id="battery-result" class="result-inline"></div>
+      </div>
+    </div>
+
+    <div class="tool-card">
+      <div class="tool-icon">&#128241;</div>
+      <h4>Device Info</h4>
+      <p>Model, Android version, build number, and serial number.</p>
+      <div class="tool-body">
+        <button class="btn btn-primary btn-sm" onclick="toolDeviceInfo()">Get Device Info</button>
+        <div id="deviceinfo-result" class="result-inline"></div>
+      </div>
+    </div>
+
+    <div class="tool-card">
+      <div class="tool-icon">&#128190;</div>
+      <h4>Storage Usage</h4>
+      <p>See how much storage is used vs. available on the device.</p>
+      <div class="tool-body">
+        <button class="btn btn-primary btn-sm" onclick="toolStorage()">Check Storage</button>
+        <div id="storage-result" class="result-inline"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <h3 class="tools-category">&#127775; Display Tweaks</h3>
+  <div class="tools-grid">
+
+    <div class="tool-card">
+      <div class="tool-icon">&#127761;</div>
+      <h4>Dark Mode Toggle</h4>
+      <p>Switch dark mode on or off instantly — no digging through Settings.</p>
+      <div class="tool-body">
+        <div class="row-gap">
+          <button class="btn btn-outline btn-sm" onclick="toolDarkMode(true)">&#127761; Dark On</button>
+          <button class="btn btn-outline btn-sm" onclick="toolDarkMode(false)">&#9728; Dark Off</button>
+        </div>
+        <div id="darkmode-result" class="result-inline"></div>
+      </div>
+    </div>
+
+    <div class="tool-card">
+      <div class="tool-icon">&#128269;</div>
+      <h4>Font Scale</h4>
+      <p>Adjust text size without going into Accessibility settings.</p>
+      <div class="tool-body">
+        <div class="input-row">
+          <input type="range" id="font-scale" min="0.85" max="1.30" step="0.05" value="1.0" oninput="document.getElementById('font-scale-val').textContent=this.value">
+          <span id="font-scale-val" class="muted">1.0</span>
+        </div>
+        <button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="toolFontScale()">Apply Font Scale</button>
+        <div id="fontscale-result" class="result-inline"></div>
+      </div>
+    </div>
+
+    <div class="tool-card">
+      <div class="tool-icon">&#128258;</div>
+      <h4>Screen Density</h4>
+      <p>Override display density (DPI). Lower = more content; higher = larger elements.</p>
+      <div class="tool-body">
+        <div class="input-row">
+          <input type="number" id="density-val" placeholder="420" class="tool-input-sm">
+          <span class="muted small">dpi</span>
+        </div>
+        <div class="row-gap" style="margin-top:8px">
+          <button class="btn btn-primary btn-sm" onclick="toolDensity()">Apply</button>
+          <button class="btn btn-outline btn-sm" onclick="toolDensityReset()">Reset</button>
+        </div>
+        <div id="density-result" class="result-inline"></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ====================================================== APPS ======= -->
+<section id="tab-apps" class="tab-content">
+  <div class="apps-header card">
+    <h3>App Manager</h3>
+    <p class="muted">Disable, uninstall, or manage app permissions — no root required.</p>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Device</label>
+        <select id="apps-device-select">
+          <option value="">-- auto detect --</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Show</label>
+        <select id="apps-filter">
+          <option value="user">User-installed apps</option>
+          <option value="system">System apps</option>
+          <option value="all">All apps</option>
+        </select>
+      </div>
+      <div class="form-group" style="align-self:flex-end">
+        <button class="btn btn-primary" onclick="loadApps()">Load Apps</button>
+      </div>
+    </div>
+    <input type="text" id="apps-search" placeholder="Search packages..." class="search-input" oninput="filterApps()" style="display:none">
+  </div>
+
+  <div id="apps-loading" class="muted" style="padding:24px;display:none">Loading packages...</div>
+  <div id="apps-table-wrap" style="display:none">
+    <table class="apps-table">
+      <thead>
+        <tr>
+          <th>Package Name</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="apps-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- Grant permission modal -->
+  <div id="grant-modal" class="modal" style="display:none">
+    <div class="modal-box">
+      <h4>Grant Permission</h4>
+      <p id="grant-pkg-label" class="muted"></p>
+      <div class="form-group">
+        <label>Permission</label>
+        <input type="text" id="grant-perm-input" placeholder="android.permission.READ_CONTACTS">
+      </div>
+      <div class="row-gap">
+        <button class="btn btn-primary" onclick="submitGrant()">Grant</button>
+        <button class="btn btn-outline" onclick="closeGrantModal()">Cancel</button>
+      </div>
+      <div id="grant-result" class="result-inline"></div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
